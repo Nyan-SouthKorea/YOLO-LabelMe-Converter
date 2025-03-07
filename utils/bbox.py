@@ -1,3 +1,5 @@
+import json
+
 class Bbox:
     def x1y1x2y2_to_yolo(self, bbox):
         '''
@@ -60,3 +62,24 @@ class Bbox:
                 else: enter = '\n'
                 class_no, b1, b2, b3, b4 = bbox
                 f.write(f'{class_no} {b1} {b2} {b3} {b4}{enter}')
+
+    # YOLO 레이블 읽고 저장하기
+    def read_label(self, label_path):
+        '''
+        txt로 된 YOLO label을 읽어서 bbox 형태로 반환
+        label_path: 레이블 경로
+        return: [[class_no, b1, b2, b3, b4], ...,]
+        '''
+        bbox_list = []
+        with open(label_path, 'r', encoding='utf-8-sig') as f:
+            full_txt = f.read()
+        txt_list = full_txt.split('\n')
+        if len(txt_list[-1]) == 0:
+            del txt_list[-1]
+        for txt in txt_list:
+            class_no, b1, b2, b3, b4 = txt.split(' ')
+            class_no, b1, b2, b3, b4 = int(class_no), float(b1), float(b2), float(b3), float(b4)
+            b1, b2, b3, b4 = max(0,b1), max(0,b2), max(0,b3), max(0,b4)
+            b1, b2, b3, b4 = min(1,b1), min(1,b2), min(1,b3), min(1,b4)
+            bbox_list.append([class_no, b1, b2, b3, b4])
+        return bbox_list

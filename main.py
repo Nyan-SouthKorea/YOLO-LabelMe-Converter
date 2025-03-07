@@ -1,19 +1,5 @@
 
-release_note = '''
-[릴리즈 노트]
-250305_v3
-- 이미지는 있는데 json이 없는 경우(레이블링 bbox가 없으면 생성 안됨) 비어있는 txt파일을 자동 생성 기능 추가
 
-
-250305_v2
-- LabelMe에서 bounding box의 x1과 x2 순서가 서로 다를 경우를 대비해 min, max 함수로 보정한 버전
-- 위 업데이트로 YOLO 레이블에서 -값이 나오는 것을 방지한다.
-
-
-250305_v1
-- 첫 개발 버전
-'''
-print(release_note)
 
 # 기본
 import os
@@ -31,7 +17,9 @@ from utils.bbox import Bbox
 from utils.print import Print_manual
 from utils.tools import Tools
 from utils.draw import Draw
+from utils.release import ReleaseNote
 
+ReleaseNote()
 
 # 모듈 개발
 class YOLO_to_LabelMe:
@@ -276,13 +264,72 @@ class Image_smart_resize:
             img = cv2.resize(img, (int(w/h*max_size), max_size))
         return img
 
+
+class Auto_flip:
+    '''
+    좌/우 플립 증강을 해주는 모듈
+    '''
+    def __init__(self):
+        self.b = Bbox()
+        self.t = Tools()
+        self.d = Draw()
+
+    def run(self, path):
+        # 플립 변환
+        print('플립 증강 중...')
+        for img_name in tqdm(os.listdir(f'{path}/images')):
+            # 이미지 취득
+            img = cv2.imread(f'{path}/images/{img_name}')
+            # 이미지 플립
+            flip_img = self._img_flip(img)
+
+            # 레이블 취득
+            label_name = f'{self.t.name(img_name)}.txt'
+            bbox_list = self.b.read_label(f'{path}/labels/{label_name}')
+            # 레이블 플립
+            flip_bbox_list = self._bbox_flip(bbox_list)
+
+            # 이미지 저장
+            flip_name = f'{self.t.name(img_name)}_flip'
+            cv2.imwrite(f'{path}/images/{flip_name}.png', flip_img)
+
+            # 레이블 저장
+            self.b.write_label(flip_bbox_list, f'{path}/labels/{flip_name}.txt')
+
+        # 그리기
+        print('그림을 그리기 위해 class_list를 요구합니다.')
+        class_list = self.t.class_list_request()
+
+        # 폴더 생성
+        os.makedirs(f'{path}/draw_flip', exist_ok=True)
+
+        # 진행
+        print('원본 + 증강 이미지 그리는 중...')
+        for img_name in tqdm(os.listdir(f'{path}/images')):  
+            label_name = f'{self.t.name(img_name)}.txt'
+            self.d.draw(f'{path}/images/{img_name}', f'{path}/labels/{label_name}', f'{path}/draw_flip/{img_name}', class_list)
+
+    def _img_flip(self, img):
+        return cv2.flip(img, 1)
+    
+    def _bbox_flip(self, bbox_list):
+        flip_bbox_list = []
+        for class_no, b1, b2, b3, b4 in bbox_list:
+            x1, y1, x2, y2 = self.b.yolo_to_x1y1x2y2([b1, b2, b3, b4])
+            new_x1 = 1 - x2
+            new_x2 = 1 - x1
+            b1, b2, b3, b4 = self.b.x1y1x2y2_to_yolo([new_x1, y1, new_x2, y2])
+            flip_bbox_list.append([class_no, b1, b2, b3, b4])
+        return flip_bbox_list
+
+
 img_format_list = ['png', 'jpg', 'jpeg', 'gif']
 
 Print_manual()
 
 # 모드 입력 받기
-mode = input('모드를 선택하세요. 1: YOLO to LabelMe | 2: LabelMe to YOLO | 3: 이미지 스마트 리사이즈 = ')
-if not mode in ['1', '2', '3']:
+mode = input('모드를 선택하세요. 1: YOLO to LabelMe | 2: LabelMe to YOLO | 3: 이미지 스마트 리사이즈 | 4: 좌우 플립 증강 = ')
+if not mode in ['1', '2', '3', '4']:
     print('모드를 잘 못 선택했습니다. 프로그램을 다시 실행하세요.')
     time.sleep(5)
     exit()
@@ -295,6 +342,8 @@ elif mode == '2':
     LabelMe_to_YOLO().convert(path)
 elif mode == '3':
     Image_smart_resize().convert(path)
+elif mode == '4':
+    Auto_flip().run(path)
 else:
     print('이상한 입력값이 입력되었습니다. 프로그램이 종료됩니다.')
     time.sleep(5)
