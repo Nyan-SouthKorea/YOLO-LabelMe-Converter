@@ -1,10 +1,15 @@
 
-'''
+release_note = '''
 [릴리즈 노트]
+250305_v2
+- LabelMe에서 bounding box의 x1과 x2 순서가 서로 다를 경우를 대비해 min, max 함수로 보정한 버전
+- 위 업데이트로 YOLO 레이블에서 -값이 나오는 것을 방지한다.
+
 
 250305_v1
-첫 개발 버전
+- 첫 개발 버전
 '''
+print(release_note)
 
 # 기본
 import os
@@ -140,8 +145,7 @@ class LabelMe_to_YOLO:
             for shapes in shape_list:
                 class_name = shapes['label']
                 points_1, points_2 = shapes['points']
-                x1, y1 = points_1
-                x2, y2 = points_2
+                x1, y1, x2, y2 = self._fix_bbox_order(points_1, points_2)
                 x1, y1, x2, y2 = self.b.bbox_pix_to_nor([x1, y1, x2, y2], w, h)
                 b1, b2, b3, b4 = self.b.x1y1x2y2_to_yolo([x1, y1, x2, y2])
                 class_no = self.class_list.index(class_name)
@@ -163,6 +167,17 @@ class LabelMe_to_YOLO:
                 self._draw_sample(goal_ea)
             except:
                 print('이상한 입력 감지됨. 프로그램 종료.')
+
+    def _fix_bbox_order(self, points_1, points_2):
+        '''LabelMe는 x1과 x2의 순서가 멋대로이다. 이 것을 바로잡아준다'''
+        x_tmp1, y_tmp1 = points_1
+        x_tmp2, y_tmp2 = points_2
+        x1 = min(x_tmp1, x_tmp2)
+        x2 = max(x_tmp1, x_tmp2)
+        y1 = min(y_tmp1, y_tmp2)
+        y2 = max(y_tmp1, y_tmp2)
+        return x1, y1, x2, y2
+        
 
     def _draw_sample(self, goal_ea=-1):
         '''최대 n장 까지만 샘플로 그려서 반환'''
