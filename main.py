@@ -1,6 +1,10 @@
 
 release_note = '''
 [릴리즈 노트]
+250305_v3
+- 이미지는 있는데 json이 없는 경우(레이블링 bbox가 없으면 생성 안됨) 비어있는 txt파일을 자동 생성 기능 추가
+
+
 250305_v2
 - LabelMe에서 bounding box의 x1과 x2 순서가 서로 다를 경우를 대비해 min, max 함수로 보정한 버전
 - 위 업데이트로 YOLO 레이블에서 -값이 나오는 것을 방지한다.
@@ -153,6 +157,9 @@ class LabelMe_to_YOLO:
 
             # YOLO 형식 txt 레이블 저장
             self.b.write_label(bbox_list, f'{path}/{self.output_folder}/{self.t.name(json_name)}.txt')
+
+        # 이빨 빠진 빈 레이블 txt 생성
+        self._make_empty_txt(path)
         
         # 샘플로 100장만 그리기
         input_command = input('그림 그리기를 원하면 엔터, 원하지 않으면 n를 입력하시오. 샘플로 그릴 이미지의 개수를 입력해도 됩니다.: ')
@@ -168,6 +175,22 @@ class LabelMe_to_YOLO:
             except:
                 print('이상한 입력 감지됨. 프로그램 종료.')
 
+    def _make_empty_txt(self, path):
+        '''YOLO 레이블이 없는 것은 빈 텍스트를 만든다'''
+        # 이미지 리스트 생성
+        img_list = []
+        for file_name in os.listdir(path):
+            if file_name.split('.')[-1] in img_format_list:
+                img_list.append(file_name)
+        
+        # 빈 레이블 생성
+        for img_name in img_list:
+            label_name = f'{self.t.name(img_name)}.txt'
+            label_path = f'{path}/{self.output_folder}/{label_name}'
+            if os.path.exists(label_path) == False:
+                with open(label_path, 'w') as f:
+                    f.write('')
+            
     def _fix_bbox_order(self, points_1, points_2):
         '''LabelMe는 x1과 x2의 순서가 멋대로이다. 이 것을 바로잡아준다'''
         x_tmp1, y_tmp1 = points_1
