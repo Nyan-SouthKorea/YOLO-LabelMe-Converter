@@ -1,6 +1,3 @@
-
-
-
 # 기본
 import os
 import json
@@ -15,7 +12,7 @@ from tqdm import tqdm
 # custom
 from utils.bbox import Bbox
 from utils.print import Print_manual
-from utils.tools import Tools
+from utils.tools import name, class_list_request, is_img_file, is_label_file
 from utils.draw import Draw
 from utils.release import ReleaseNote
 
@@ -29,25 +26,28 @@ class YOLO_to_LabelMe:
         '''
         self.output_folder = 'output_labelme'
         self.b = Bbox()
-        self.t = Tools()
     
     def convert(self, path):
         # 폴더 생성
         os.makedirs(f'{path}/{self.output_folder}', exist_ok=True)
 
         # class_list 요청
-        class_list = self.t.class_list_request()
+        class_list = class_list_request()
         
         # for문 시작
         img_list = natsorted(os.listdir(f'{path}/images'))
         for img_name in tqdm(img_list, desc='레이블 생성 중...'):            
             try:
+                # 이미지 유효성 확인
+                if is_img_file(img_name) == False:
+                    continue
+
                 # 이미지 정보 취득
                 img = cv2.imread(f'{path}/images/{img_name}')
                 h, w, _ = img.shape
 
                 # 레이블 읽기
-                label_name = f'{self.t.name(img_name)}.txt'
+                label_name = f'{name(img_name)}.txt'
                 with open(f'{path}/labels/{label_name}', 'r', encoding='utf-8-sig') as f:
                     txt_split_by_enter = f.read().split('\n')
                 # 맨 뒤 빈 텍스트 삭제 처리
@@ -80,7 +80,7 @@ class YOLO_to_LabelMe:
             default_json['imagePath'] = img_name
 
             # json 저장
-            with open(f'{path}/{self.output_folder}/{self.t.name(img_name)}.json', 'w') as f:
+            with open(f'{path}/{self.output_folder}/{name(img_name)}.json', 'w') as f:
                 json.dump(default_json, f, indent=4)
 
     def _get_default_json(self):
@@ -110,20 +110,19 @@ class LabelMe_to_YOLO:
         '''
         self.output_folder = 'output_yolo'
         self.b = Bbox()
-        self.t = Tools()
 
     def convert(self, path):
         # 폴더 생성
         os.makedirs(f'{path}/{self.output_folder}', exist_ok=True)
 
         # class_list 요청
-        self.class_list = self.t.class_list_request()
+        self.class_list = class_list_request()
 
         # for문 시작
         print('변환 시작')
         for json_name in tqdm(os.listdir(path)):
             # json파일만 읽기
-            if json_name.split('.')[-1] != 'json':
+            if is_label_file(json_name) == False:
                 continue
         
             # json 데이터 분석
@@ -144,7 +143,7 @@ class LabelMe_to_YOLO:
                 bbox_list.append([class_no, b1, b2, b3, b4])
 
             # YOLO 형식 txt 레이블 저장
-            self.b.write_label(bbox_list, f'{path}/{self.output_folder}/{self.t.name(json_name)}.txt')
+            self.b.write_label(bbox_list, f'{path}/{self.output_folder}/{name(json_name)}.txt')
 
         # 이빨 빠진 빈 레이블 txt 생성
         self._make_empty_txt(path)
@@ -168,12 +167,12 @@ class LabelMe_to_YOLO:
         # 이미지 리스트 생성
         img_list = []
         for file_name in os.listdir(path):
-            if file_name.split('.')[-1] in img_format_list:
+            if is_img_file(file_name) == True:
                 img_list.append(file_name)
         
         # 빈 레이블 생성
         for img_name in img_list:
-            label_name = f'{self.t.name(img_name)}.txt'
+            label_name = f'{name(img_name)}.txt'
             label_path = f'{path}/{self.output_folder}/{label_name}'
             if os.path.exists(label_path) == False:
                 with open(label_path, 'w') as f:
@@ -202,7 +201,7 @@ class LabelMe_to_YOLO:
         file_list = os.listdir(path)
         img_list = []
         for file in file_list:
-            if file.split('.')[-1] in img_format_list:
+            if is_img_file(file) == True:
                 img_list.append(file)
         
         # n장만 그리기 진행
@@ -216,7 +215,7 @@ class LabelMe_to_YOLO:
         
         # 그리기
         for img_name in tqdm(img_list):
-            label_name = f'{self.t.name(img_name)}.txt'
+            label_name = f'{name(img_name)}.txt'
             d.draw(f'{path}/{img_name}', f'{path}/{self.output_folder}/{label_name}', f'{path}/draw/{img_name}', self.class_list)
 
 class Image_smart_resize:
@@ -240,7 +239,7 @@ class Image_smart_resize:
         file_list = os.listdir(path)
         img_list = []
         for file in file_list:
-            if file.split('.')[-1] in img_format_list:
+            if is_img_file(file) == True:
                 img_list.append(file)
         
         # 리사이즈 진행 후 저장
@@ -264,33 +263,35 @@ class Image_smart_resize:
             img = cv2.resize(img, (int(w/h*max_size), max_size))
         return img
 
-
 class Auto_flip:
     '''
     좌/우 플립 증강을 해주는 모듈
     '''
     def __init__(self):
         self.b = Bbox()
-        self.t = Tools()
         self.d = Draw()
 
     def run(self, path):
         # 플립 변환
         print('플립 증강 중...')
         for img_name in tqdm(os.listdir(f'{path}/images')):
+            # 유효성 검사
+            if is_img_file(img_name) == False:
+                continue
+
             # 이미지 취득
             img = cv2.imread(f'{path}/images/{img_name}')
             # 이미지 플립
             flip_img = self._img_flip(img)
 
             # 레이블 취득
-            label_name = f'{self.t.name(img_name)}.txt'
+            label_name = f'{name(img_name)}.txt'
             bbox_list = self.b.read_label(f'{path}/labels/{label_name}')
             # 레이블 플립
             flip_bbox_list = self._bbox_flip(bbox_list)
 
             # 이미지 저장
-            flip_name = f'{self.t.name(img_name)}_flip'
+            flip_name = f'{name(img_name)}_flip'
             cv2.imwrite(f'{path}/images/{flip_name}.png', flip_img)
 
             # 레이블 저장
@@ -298,7 +299,7 @@ class Auto_flip:
 
         # 그리기
         print('그림을 그리기 위해 class_list를 요구합니다.')
-        class_list = self.t.class_list_request()
+        class_list = class_list_request()
 
         # 폴더 생성
         os.makedirs(f'{path}/draw_flip', exist_ok=True)
@@ -306,7 +307,7 @@ class Auto_flip:
         # 진행
         print('원본 + 증강 이미지 그리는 중...')
         for img_name in tqdm(os.listdir(f'{path}/images')):  
-            label_name = f'{self.t.name(img_name)}.txt'
+            label_name = f'{name(img_name)}.txt'
             self.d.draw(f'{path}/images/{img_name}', f'{path}/labels/{label_name}', f'{path}/draw_flip/{img_name}', class_list)
 
     def _img_flip(self, img):
@@ -322,8 +323,6 @@ class Auto_flip:
             flip_bbox_list.append([class_no, b1, b2, b3, b4])
         return flip_bbox_list
 
-
-img_format_list = ['png', 'jpg', 'jpeg', 'gif']
 
 Print_manual()
 

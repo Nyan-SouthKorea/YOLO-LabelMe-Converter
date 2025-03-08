@@ -2,6 +2,12 @@ class ReleaseNote:
     def __init__(self):
         release_note = '''
         [릴리즈 노트]
+        250308_v1
+        - 모든 파일명을 검사할 때 유효성 검사(시스템 파일 때문에 에러 나는 부분 방지)
+            - 이미지 필터링 기준: png, jpg, jpeg, gif
+            - 레이블 필터링 기준: txt, json
+        - Tools 객체 말고 함수의 집합으로 변경. 모든 코드에서 glabal로 사용하는 것이 더 적합하다고 판단
+
         250307_v4
         - 좌우 플립 증강 모드 추가(4번)
         
